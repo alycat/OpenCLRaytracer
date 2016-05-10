@@ -1,0 +1,20 @@
+﻿  stdafx.cpp
+  Triangle.cpp
+  Sphere.cpp
+  OpenCLRaytracer.cpp
+c:\users\alyssa\documents\openclraytracer\openclraytracer\openclraytracer.cpp(32): warning C4244: 'initializing' : conversion from 'double' to 'cl_float', possible loss of data
+c:\users\alyssa\documents\openclraytracer\openclraytracer\openclraytracer.cpp(222): warning C4305: '=' : truncation from 'double' to 'cl_float'
+c:\users\alyssa\documents\openclraytracer\openclraytracer\openclraytracer.cpp(227): warning C4305: '=' : truncation from 'double' to 'cl_float'
+c:\users\alyssa\documents\openclraytracer\openclraytracer\openclraytracer.cpp(228): warning C4305: '=' : truncation from 'double' to 'cl_float'
+c:\users\alyssa\documents\openclraytracer\openclraytracer\openclraytracer.cpp(233): warning C4305: '=' : truncation from 'double' to 'cl_float'
+c:\users\alyssa\documents\openclraytracer\openclraytracer\openclraytracer.cpp(274): warning C4305: '=' : truncation from 'double' to 'cl_float'
+c:\users\alyssa\documents\openclraytracer\openclraytracer\openclraytracer.cpp(307): warning C4101: 'image' : unreferenced local variable
+  Object.cpp
+c:\users\alyssa\documents\openclraytracer\openclraytracer\object.cpp(7): warning C4305: 'initializing' : truncation from 'double' to 'cl_float'
+  KernelArguments.cpp
+c:\users\alyssa\documents\openclraytracer\openclraytracer\kernelarguments.cpp(67): warning C4018: '<' : signed/unsigned mismatch
+c:\users\alyssa\documents\openclraytracer\openclraytracer\kernelarguments.cpp(81): warning C4018: '<' : signed/unsigned mismatch
+c:\users\alyssa\documents\openclraytracer\openclraytracer\kernelarguments.cpp(96): warning C4018: '<' : signed/unsigned mismatch
+  ContextManager.cpp
+  Generating Code...
+  OpenCLRaytracer.vcxproj -> C:\Users\Alyssa\Documents\OpenCLRaytracer\Debug\OpenCLRaytracer.exe
