@@ -2,7 +2,7 @@ typedef struct Ray{
 	float3 origin;
 	float3 direction;
 }ray;
-
+/*
 typedef struct KDNode{
 	float3 dimensions;
 	float3 position;
@@ -19,7 +19,7 @@ typedef struct PhotonStruct{
 	char theta;
 	short flag;
 }photon;
-
+*/
 typedef struct PointOnObject{
 	float3 point;
 	int object;
@@ -48,14 +48,14 @@ typedef struct ColorData{
 
 float3 toneMapping(float3 color)
 { 
-	float l = 2.5f;
+	float l = 5.0f;
 	float3 white = (float3)(l, l, l);
 	return (color + (color*color)/(white*white)) / (color + (float3)(1, 1, 1));
 }
 
 float3 linearTR(float3 color)
 {
-	float max_value = 5.0f;
+	float max_value = 1.5f;
 	return pow(color, 1.5f) / max_value;
 }
 
@@ -98,7 +98,7 @@ float absf(float a)
 
 float3 saturate(float3 a)
 {
-	return (float3)(clampf(a.x, 0, 1), clampf(a.y, 0, 1), clampf(a.z, 0, 1));
+	return (float3)(clampf(a.x, 0.0f, 1.0f), clampf(a.y, 0.0f, 1.0f), clampf(a.z, 0.0f, 1.0f));
 }
 
 float3 multiplyVectors(float3 a, float3 b)
@@ -136,21 +136,6 @@ float3 checker(float3 point, float4 uv)
 	return color;
 }
 
-float3 illuminate(id intersection, float3 color)
-{
-	float diff = dot(-intersection.source, intersection.normal) * 0.25f;
-	float spec = pow(dot(intersection.reflect, intersection.outgoing), 0.9f) * 0.25f;
-	return (float3)saturate(((diff * color) + (spec * intersection.light_color)));
-	/*
-	float3 s = intersection.light_color * intersection.reflect * intersection.outgoing;
-	float3 cdiff = color * intersection.light_color * intersection.source * intersection.normal*12.75f;
-	float3 spec = (float3)pow(s, 1) * 0.75f;
-	cdiff = (float3)forcePositive(cdiff);
-	spec = (float3)forcePositive(spec);
-	return cdiff + spec;
-	*/
-}
-
 
 float3 cookTorrance(id intersection, float3 color, float roughnessValue)
 {
@@ -181,7 +166,7 @@ float3 cookTorrance(id intersection, float3 color, float roughnessValue)
 		float r2 = (NdotH * NdotH - 1.0f) / (mSquared * NdotH * NdotH);
 		float roughness = r1 * exp(r2);
 
-		float fresnal = pow(1.0f - VdotH, 1.25f);
+		float fresnal = pow(1.0f - VdotH, 5.0f);
 		fresnal *= (1.0f - F0);
 		fresnal += F0;
 		specular = (fresnal * geoAtt * roughness) / (NdotV * NdotL * 3.141529f);
@@ -199,7 +184,7 @@ float3 rayIntersectionTri(ray inray, float3 a, float3 b, float3 c)
 	float3 p = cross(inray.direction, e_2);
 	float det = dot(e_1, p);
 
-	float epsilon = 0.00000001;
+	float epsilon = 0.000000001f;
 	if (det > -epsilon && det < epsilon){
 		return point;
 	}
@@ -224,7 +209,7 @@ float3 rayIntersectionTri(ray inray, float3 a, float3 b, float3 c)
 		return point;
 	}
 
-	return (float3)((float3)(a *(1 - u - v)) + (float3)(b * u) + (float3)(c * v));
+	return (float3)((float3)(a *(1.0f - u - v)) + (float3)(b * u) + (float3)(c * v));
 }
 
 float3 rayIntersectionSpr(ray inray, float3 center, float r)
@@ -272,6 +257,7 @@ float3 triangleNormal(float3 ta, float3 tb, float3 tc)
 }
 
 
+
 closest_point closestPoint(
 	ray incoming, global float3* ta, global float3 * tb, global float3* tc, int triCount,
 	global float3* center, global float *r, int sprCount
@@ -295,7 +281,7 @@ closest_point closestPoint(
 	}
 	for (int s = 0; s < sprCount; ++s)
 	{
-		float3 point = (float3)rayIntersectionSpr(incoming, (float3)center[s], (float)r[s]);
+		float3 point = (float3)rayIntersectionSpr(incoming, (float3)center[s], r[s]);
 		if (inBounds(point) && (distance(point, incoming.origin)) > r[s])
 		{
 			if (distance(point, incoming.origin) < distance(closest, incoming.origin))
@@ -310,7 +296,17 @@ closest_point closestPoint(
 	return closestPt;
 }
 
-
+bool isInShadow(closest_point closest, int index, int object)
+{
+	if (inBounds(closest.point))
+	{
+		if (closest.object != object)
+			return true;
+		else if (closest.object == object && closest.index != index)
+			return true;
+	}
+	return false;
+}
 
 color_data returnColorAtPointOnSphere(
 	ray incoming, global float3* ta, global float3 * tb, global float3* tc, global float* t_kr, global float* t_kt, int triCount,
@@ -321,29 +317,20 @@ color_data returnColorAtPointOnSphere(
 { 
 	id intersect;
 	float3 l_color = (float3)(0, 0, 0);
-	int depth = d;
+	int depth = INT_MAX;
 	color_data colordata = { l_color, incoming, d, factor };
 	for(int l = 0; l < lightCount; ++l)
 	{
-		for (float radius = 0.25; radius < 0.3; radius += 0.01)
+		for (float radius = 0.25f; radius < 0.75f; radius += 0.1f)
 		{
 			float3 offset[5] = { (float3)(0, 0, 0), (float3)(radius, 0, 0), (float3)(0, radius, 0), (float3)(-radius, 0, 0), (float3)(0, -radius, 0) };
-			for (int i = 0; i < 5; ++i)
+			for (int o = 0; o < 5; ++o)
 			{
-				float3 light_pos = light[l] + offset[i];
+				float3 light_pos = light[l] + offset[o];
 				ray shadow = { light_pos, (float3)normal(point - light_pos) };
 				bool inShadow = false;
-				for (int i = 0; i < triCount; ++i)
-				{
-					float3 npoint = (float3)rayIntersectionTri(shadow, (float3)ta[i], (float3)tb[i], (float3)tc[i]);
-					inShadow = inBounds(npoint) && distance(npoint, shadow.origin) < 0;
-				}
-				for (int j = 0; j < sprCount; ++j)
-				{
-					float3 npoint = (float3)rayIntersectionSpr(shadow, (float3)center[j], (float)r[j]);
-					inShadow = inShadow || (inBounds(npoint) && s != j);
-				}
-				if (!inShadow)
+				closest_point closest = closestPoint(shadow, ta, tb, tc, triCount, center, r, sprCount);
+				if (!isInShadow(closest, s, 1))
 				{
 					light_pos = light[l];
 					intersect.point = point;
@@ -357,24 +344,22 @@ color_data returnColorAtPointOnSphere(
 					intersect.camera = (float3)normal(-view);
 					intersect.center = (float3)center[s];
 
-					colordata.color += ((float3)cookTorrance(intersect, sprColor[s], 0.25f))* factor * (1.0f - radius)/20.0f;
-					colordata.factor *= 0.5f;
+					colordata.color += ((float3)cookTorrance(intersect, sprColor[s], 0.1f))* factor / 20.0f;
+					colordata.factor /= 2;
 					colordata.outray.origin = point;
-					depth = INT_MAX;
+					depth = d;
 					if (spr_kr[s] > 0.0f){
-						colordata.factor = spr_kr[s];
+						colordata.factor = factor * spr_kr[s];
 						colordata.outray.direction = (float3)reflect(incoming.direction, intersect.normal);
 						colordata.outray.direction.z *= -1.0;
-						depth = d;
 					}
 					else if (spr_kt[s] > 0.0f){
-						colordata.factor = spr_kt[s];
+						colordata.factor = factor * spr_kt[s];
 						colordata.outray.direction = (float3)transmit(incoming.direction, intersect.normal);
-						depth = d;
 					}
 				}
 				else
-					depth = INT_MAX;
+					break;
 			}
 		}
 	}
@@ -400,25 +385,16 @@ color_data returnColorAtPointOnTriangle(
 	uv.y = max(max(ta[t].y, tb[t].y), tc[t].y);
 	for (int l = 0; l < lightCount; ++l)
 	{
-		for (float radius = 0.25; radius < 0.3; radius += 0.01)
+		for (float radius = 0.25f; radius < 0.75f; radius += 0.1f)
 		{
 			float3 offset[5] = { (float3)(0, 0, 0), (float3)(radius, 0, 0), (float3)(0, radius, 0), (float3)(-radius, 0, 0), (float3)(0, -radius, 0) };
-			for (int i = 0; i < 5; ++i)
+			for (int o = 0; o < 5; ++o)
 			{
-				float3 light_pos = light[l] + offset[i];
+				float3 light_pos = light[l] + offset[o];
 				ray shadow = { light_pos, (float3)normal(point - light_pos) };
-				bool inShadow = false;
-				for (int i = 0; i < triCount; ++i)
-				{
-					float3 npoint = (float3)rayIntersectionTri(shadow, (float3)ta[i], (float3)tb[i], (float3)tc[i]);
-					inShadow = (inBounds(npoint) && i != t);
-				}
-				for (int j = 0; j < sprCount; ++j)
-				{
-					float3 npoint = (float3)rayIntersectionSpr(shadow, (float3)center[j], (float)r[j]);
-					inShadow = inShadow || inBounds(npoint);
-				}
-				if (!inShadow)
+				bool inShadow = false; 
+				closest_point closest = closestPoint(shadow, ta, tb, tc, triCount, center, r, sprCount);
+				if (!isInShadow(closest, t, 0))
 				{
 					light_pos = light[l];
 					intersect.point = point;
@@ -432,7 +408,7 @@ color_data returnColorAtPointOnTriangle(
 					intersect.camera = (float3)normal(-view);
 					intersect.center = (float3)((ta[t] + tb[t] + tc[t]) / 3);
 					float3 checker_color = (float3)checker(point, uv);
-					colordata.color += ((float3)cookTorrance(intersect, checker_color, 0.3f)) * factor * (1.0f - radius)/20.0f;
+					colordata.color += ((float3)cookTorrance(intersect, checker_color, 0.5f)) * factor / 20.0f;
 
 
 					depth = INT_MAX;
@@ -441,23 +417,24 @@ color_data returnColorAtPointOnTriangle(
 					if (t_kr[t] > 0.0f)
 					{
 						colordata.outray.direction = (float3)reflect(incoming.direction, intersect.normal);
-						colordata.outray.direction.z *= -1.0;
-						colordata.factor = t_kr[t];
+						colordata.outray.direction.z *= -1.0f;
+						colordata.factor = factor * t_kr[t];
 						depth = d;
 					}
 					else if (t_kt[t] > 0.0f)
 					{
 						colordata.outray.direction = (float3)transmit(incoming.direction, intersect.normal);
-						colordata.factor = t_kt[t];
+						colordata.factor = factor * t_kt[t];
 						depth = d;
 					}
 				}
-				else
+				else{
 					depth = INT_MAX;
+				}
 			}
 		}
 	}
-
+	colordata.depth = depth;
 	return colordata;
 }
 
@@ -477,14 +454,14 @@ float3 spawn(
 		color_data colordata = { (float3)(0, 0, 0), outray, d, factor };
 		if (distance(max_pt, closest.point) == 0)
 		{
-			color += (float3)(0, 0.5, 1) * factor;
+			color += (float3)(0.0f, 0.5f, 1.0f) * factor;
 			break;
 		}
-		if (closest.object == 0)
+		else if (closest.object == 0)
 			colordata = returnColorAtPointOnTriangle(outray, ta, tb, tc, t_kr, t_kt, triCount, center, r, sprColor, spr_kr, spr_kt, sprCount, light, lightColor, num_photons, lightCount, view, closest.point, closest.index, d, factor);
 		else if (closest.object == 1)
 			colordata = returnColorAtPointOnSphere(outray, ta, tb, tc, t_kr, t_kt, triCount, center, r, sprColor, spr_kr, spr_kt, sprCount, light, lightColor, num_photons, lightCount, view, closest.point, closest.index, d, factor);
-		d = colordata.depth - 1;
+		d = colordata.depth;
 		factor = colordata.factor;
 		outray = colordata.outray;
 		color += colordata.color;
@@ -529,15 +506,12 @@ __kernel void scan(
 	float3 L = C - u_vector * w / 2.0f - v_vector * h / 2.0f;
 	float3 p_location = L + u_vector * x *pixelW + v_vector * y * pixelH;
 
-	//float3 direction = (float3)normal((float3)(p_x, p_y, f) - origin);
 	float3 direction = (float3)normal(p_location - origin);
 	ray outray = { origin, direction };
-
-	ray reflection_ray = outray;
 
 	float3 final_color = (float3)spawn(outray, ta, tb, tc, tri_kr, tri_kt, triCount, 
 		center, r, sprColor, spr_kr, spr_kt, sprCount, 
 		light, light_color, num_photons, lightCount, view);
 
-	color[pixel] = (float3)saturate(/*(float3)toneMapping(final_color)*/final_color/2);
+	color[pixel] = (float3)saturate((float3)toneMapping(final_color));
 }

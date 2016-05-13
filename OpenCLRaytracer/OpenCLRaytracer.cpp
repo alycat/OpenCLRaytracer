@@ -214,22 +214,22 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	light_color = (cl_float3*)malloc(sizeof(cl_float3) * lightCount);
 	num_photons = (cl_int*)malloc(sizeof(cl_int) * lightCount);
 
-	light[0].x = -1, light[0].y = 12, light[0].z = -5;
+	light[0].x = -1.0, light[0].y = 12.0, light[0].z = -5.0;
 	light_color[0].x = 2.0, light_color[0].y = 2.0, light_color[0].y = 2.0;
 	num_photons[0] = 4000;
 
 
-	light[1].x = -1.7, light[1].y = 1, light[1].z = 5;
-	light_color[1].x = 0.25, light_color[1].y = 0.25, light_color[1].y = 0.25;
+	light[1].x = -1.7, light[1].y = 1.0, light[1].z = 5.0;
+	light_color[1].x = 0.1, light_color[1].y = 0.1, light_color[1].y = 0.1;
 	num_photons[1] = 1000;
 
 
-	light[2].x = 0, light[2].y = 2.6, light[2].z = 6;
+	light[2].x = 0.0, light[2].y = 2.6, light[2].z = 6.0;
 	light_color[2].x = 0.1, light_color[2].y = 0.1, light_color[2].y = 0.1;
 	num_photons[2] = 1000;
 
 
-	light[3].x = 0, light[3].y = -5, light[3].z = -2;
+	light[3].x = 0.0, light[3].y = -5.0, light[3].z = -2.0;
 	light_color[3].x = 0.1, light_color[3].y = 0.1, light_color[3].y = 0.1;
 	num_photons[3] = 1000;
 
@@ -253,11 +253,11 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	cl_float3 c;
 	c.x = 4.0, c.y = 1.5, c.z = 22;
 	tc[0] = c;
-	triColor[0].x = 1, triColor[0].y = 1, triColor[0].z = 0;
-	tri_kr[0] = 0.01f;
+	triColor[0].x = 0, triColor[0].y = 0, triColor[0].z = 0;
+	tri_kr[0] = 0.25f;
 	tri_kt[0] = 0.0f;
-	triColor[1].x = 1, triColor[1].y = 1, triColor[1].z = 0;
-	tri_kr[1] = 0.01f;
+	triColor[1].x = 0, triColor[1].y = 0, triColor[1].z = 0;
+	tri_kr[1] = 0.25f;
 	tri_kt[1] = 0.0f;
 
 
