@@ -12,8 +12,8 @@ Triangle::Triangle() : Object()
 		m_points[i] = zero;
 }
 
-Triangle::Triangle(cl_float3 A, cl_float3 B, cl_float3 C, cl_float kt, cl_float kr, cl_float roughness, cl_bool isChecker)
-	:Object(kt, kr, roughness, isChecker)
+Triangle::Triangle(cl_float3 A, cl_float3 B, cl_float3 C, cl_float3 color, cl_float kr, cl_float kt, cl_float roughness, cl_bool isChecker)
+	:Object(color, kr, kt, roughness, isChecker)
 {
 	m_points[0] = A;
 	m_points[1] = B;
@@ -21,14 +21,23 @@ Triangle::Triangle(cl_float3 A, cl_float3 B, cl_float3 C, cl_float kt, cl_float 
 }
 
 Triangle::Triangle(const Triangle& copy)
-	:Object(copy)
 {
 	std::memcpy(m_points, copy.m_points, sizeof(cl_float3) * 3);
+	m_color = copy.m_color;
+	m_kr = copy.m_kr;
+	m_kt = copy.m_kt;
+	m_roughness = copy.m_roughness;
+	m_isChecker = copy.m_isChecker;
 }
 
 Triangle& Triangle::operator=(const Triangle& copy)
 {
 	std::memcpy(m_points, copy.m_points, sizeof(cl_float3) * 3);
+	m_color = copy.m_color;
+	m_kr = copy.m_kr;
+	m_kt = copy.m_kt;
+	m_roughness = copy.m_roughness;
+	m_isChecker = copy.m_isChecker;
 	return *this;
 }
 

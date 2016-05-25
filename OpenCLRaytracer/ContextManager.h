@@ -2,6 +2,8 @@
 #define _CONTEXTMANAGER_H
 
 #include <CL\cl.h>
+#include <vector>
+#include <map>
 
 class ContextManager
 {

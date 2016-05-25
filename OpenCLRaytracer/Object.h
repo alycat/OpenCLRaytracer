@@ -6,11 +6,15 @@
 class Object{
 public:
 	Object();
-	Object(cl_float kt, cl_float kr, cl_float roughness, cl_bool checker);
+	Object(cl_float3 color, cl_float kr, cl_float kt, cl_float roughness, cl_bool checker);
 	Object(const Object& copy);
 	Object& operator=(const Object& copy);
 
 	~Object();
+
+	cl_float3 getColor();
+	void setColor(cl_float3 color);
+	__declspec(property(get = getColor, put = setColor)) cl_float3 color;
 
 	cl_float getKt();
 	void setKt(cl_float kt);
@@ -28,6 +32,7 @@ public:
 	void setIsChecker(cl_bool isChecker);
 	__declspec(property(get = getIsChecker, put = setIsChecker)) cl_bool isChecker;
 protected:
+	cl_float3 m_color;
 	cl_float m_kt;
 	cl_float m_kr;
 	cl_float m_roughness;

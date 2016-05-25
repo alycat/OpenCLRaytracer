@@ -3,13 +3,13 @@
 #include "Object.h"
 
 Object::Object()
-	:m_kt(0), m_kr(0), m_roughness(0.3), m_isChecker(false)
+	:m_color({ 0, 0, 0 }), m_kt(0.0f), m_kr(0.0f), m_roughness(0.3f), m_isChecker(CL_FALSE)
 {
 
 }
 
-Object::Object(cl_float kt, cl_float kr, cl_float roughness, cl_bool isChecker)
-	: m_kt(kt), m_kr(kr), m_roughness(roughness), m_isChecker(isChecker)
+Object::Object(cl_float3 color, cl_float kr, cl_float kt, cl_float roughness, cl_bool isChecker)
+	: m_color(color), m_kt(kt), m_kr(kr), m_roughness(roughness), m_isChecker(isChecker)
 {
 
 }
@@ -22,6 +22,7 @@ Object::Object(const Object& copy)
 
 Object& Object::operator=(const Object& copy)
 {
+	m_color = copy.m_color;
 	m_kt = copy.m_kt;
 	m_kr = copy.m_kr;
 	m_roughness = copy.m_roughness;
@@ -33,6 +34,9 @@ Object::~Object()
 {
 
 }
+
+cl_float3 Object::getColor(){ return m_color; }
+void Object::setColor(cl_float3 color){ m_color = color; }
 
 cl_float Object::getKt(){ return m_kt; }
 void Object::setKt(cl_float kt){ m_kt = kr; }

@@ -2,7 +2,7 @@ typedef struct Ray{
 	float3 origin;
 	float3 direction;
 }ray;
-/*
+
 typedef struct KDNode{
 	float3 dimensions;
 	float3 position;
@@ -19,7 +19,7 @@ typedef struct PhotonStruct{
 	char theta;
 	short flag;
 }photon;
-*/
+
 typedef struct PointOnObject{
 	float3 point;
 	int object;
@@ -48,7 +48,7 @@ typedef struct ColorData{
 
 float3 toneMapping(float3 color)
 { 
-	float l = 5.0f;
+	float l = 2.0f;
 	float3 white = (float3)(l, l, l);
 	return (color + (color*color)/(white*white)) / (color + (float3)(1, 1, 1));
 }
@@ -208,7 +208,6 @@ float3 rayIntersectionTri(ray inray, float3 a, float3 b, float3 c)
 	if (t <= epsilon){
 		return point;
 	}
-
 	return (float3)((float3)(a *(1.0f - u - v)) + (float3)(b * u) + (float3)(c * v));
 }
 
@@ -438,16 +437,88 @@ color_data returnColorAtPointOnTriangle(
 	return colordata;
 }
 
+float3 photonMap(float3 point, global float3* photon_pos, global float3* photon_pow, int total_photons)
+{
+	float3 color = (float3)(0, 0, 0); 
+	const int max_photons = 100;
+	float3 photon_colors[max_photons];
+	float photon_dis[max_photons];
+	int photon_count = 0;
+	for (int p = 0; p < total_photons; ++p)
+	{
+		float current_distance = distance(photon_pos[p], point);
+		if (current_distance < 1)
+		{
+			if (photon_count < max_photons)
+			{
+				if (photon_count == 0)
+				{
+					photon_dis[photon_count] = current_distance;
+					photon_colors[photon_count] = photon_pow[p];
+					photon_count++;
+				}
+				else{
+					int i = 0;
+					for (i; i < photon_count; ++i)
+					{
+						if (photon_dis[i] > current_distance)
+						{
+							break;
+						}
+					}
+					for (int j = photon_count; j > i; --j)
+					{
+						photon_dis[j] = photon_dis[j - 1];
+						photon_colors[j] = photon_colors[j - 1];
+					}
+					photon_dis[i] = current_distance;
+					photon_colors[i] = photon_pow[p];
+					photon_count++;
+					photon_count++;
+				}
+			}
+			else
+			{
+				int i = 0;
+				for (i; i < photon_count; ++i)
+				{
+					if (photon_dis[i] > current_distance)
+					{
+						break;
+					}
+				}
+				for (int j = photon_count - 1; j > i; --j)
+				{
+					photon_dis[j] = photon_dis[j - 1];
+					photon_colors[j] = photon_colors[j - 1];
+				}
+				photon_dis[i] = current_distance;
+				photon_colors[i] = photon_pow[p];
+			}
+
+		}
+	}
+
+	for (int p = 0; p < photon_count; p++)
+	{
+		color += photon_colors[p];
+	}
+	return color;
+
+}
+
 float3 spawn(
 	ray incoming, global float3* ta, global float3 * tb, global float3* tc, global float* t_kr, global float* t_kt, int triCount,
 	global float3* center, global float *r, global float3* sprColor, global float* spr_kr, global float* spr_kt, int sprCount,
-	global float3* light, global float3* lightColor, global int* num_photons, int lightCount, float3 view
+	global float3* light, global float3* lightColor, global int* num_photons, int lightCount, float3 view,
+	global float3* photon_pos, global float3* photon_pow, int total_photons
 	)
 {
 	float3 color = (float3)(0, 0, 0);
 	float3 max_pt = (float3)(FLT_MAX, FLT_MAX, FLT_MAX);
 	float factor = 1.0;
 	ray outray = incoming;
+	float3 photon_color = (float3)(0, 0, 0);
 	for (int d = 0; d < 1000; ++d)
 	{
 		closest_point closest = closestPoint(outray, ta, tb, tc, triCount, center, r, sprCount);
@@ -461,22 +532,127 @@ float3 spawn(
 			colordata = returnColorAtPointOnTriangle(outray, ta, tb, tc, t_kr, t_kt, triCount, center, r, sprColor, spr_kr, spr_kt, sprCount, light, lightColor, num_photons, lightCount, view, closest.point, closest.index, d, factor);
 		else if (closest.object == 1)
 			colordata = returnColorAtPointOnSphere(outray, ta, tb, tc, t_kr, t_kt, triCount, center, r, sprColor, spr_kr, spr_kt, sprCount, light, lightColor, num_photons, lightCount, view, closest.point, closest.index, d, factor);
+		
+		photon_color += (float3)photonMap(closest.point, photon_pos, photon_pow, total_photons);
 		d = colordata.depth;
 		factor = colordata.factor;
 		outray = colordata.outray;
 		color += colordata.color;
 	}
-	return color;
+	return color +(photon_color * 10);
+}
+
+float3 clampf3(float3 incoming, float minf, float maxf)
+{ 
+	return (float3)(max(min(incoming.x, maxf), minf), max(min(incoming.y, maxf), minf), max(min(incoming.z, maxf), minf));
 }
 
 float random()
 {
-	return 0;
+	unsigned short lfsr = 0xACE1u;
+	unsigned bit = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5) & 1);
+	return lfsr = (lfsr >> 1) | (bit << 15);
 }
 
 float3 random3()
 {
 	return (float3)(random(), random(), random());
+}
+
+__kernel void buildPhotonMap(
+	__global float3 *ta, __global float3 *tb, __global float3 *tc, __global float3 *triColor, __global float *tri_kr, __global float *tri_kt, int triCount,
+	__global float3 *center, __global float *r, __global float3 *sprColor, __global float *spr_kr, __global float *spr_kt, int sprCount,
+	__global float3 *light, __global float3 *light_color, __global int *num_photons, int lightCount,
+	__global float3 *photon_pos, __global float3 *photon_pow
+	)
+{
+	int total_photons = 0;
+	for(int l = 0; l < lightCount; ++l)
+	{ 
+		int photon_count = 0;
+		while(photon_count < num_photons[l])
+		{
+			photon_count++;
+			float3 direction = (float3)(1, 1, 1);// = (float3)normal((float3)random3());
+			while ((direction.x * direction.x) + (direction.y * direction.y) + (direction.z * direction.z)> 1)
+			{ 
+				direction = (float3)normal((float3)random3() * (float3)(0, -1 , 0));
+			}
+			ray light_ray = { light[l], direction };
+			bool stored = false;
+			while (!stored)
+			{
+				closest_point closest = closestPoint(light_ray, ta, tb, tc, triCount, center, r, sprCount);
+				float factor = absf(distance(closest.point, light[l]));
+				factor *= factor ;
+				if (!inBounds(closest.point))
+					stored = true;
+
+				int i = closest.index;
+				float3 V = (float3)(light[l] - closest.point);
+				light_ray.origin = closest.point;
+				float Xi = random();
+				if(Xi < 0.1)
+				{
+					photon_pos[total_photons] = closest.point;
+					photon_pow[total_photons] = (float3)clampf3((light_color[l]) / (factor), 0, 1);
+					photon_count++;
+					total_photons++;
+					stored = true;
+				}
+				else{
+					if (closest.object == 0)
+					{
+						float3 N = (float3)triangleNormal(ta[i], tb[i], tc[i]);
+						if (tri_kr[i] > 0.3)
+						{
+							light_ray.direction = (float3)reflect(V, N);
+							light_ray.direction.z *= -1;
+						}
+						else if (tri_kt[i] > 0.3)
+						{
+							light_ray.direction = (float3)transmit(V, N);
+						}
+						else
+						{
+							photon_pos[total_photons] = closest.point;
+							photon_pow[total_photons] = (float3)clampf3((light_color[l]) / (factor), 0, 1);
+							photon_count++;
+							total_photons++;
+							stored = true;
+						}
+					}
+					else if (closest.object == 1)
+					{
+						float3 N = (float3)normal(center[i] - closest.point);
+						if (spr_kr[i] > 0.3)
+						{
+							light_ray.direction = (float3)reflect(V, N);
+							light_ray.direction.z *= -1;
+						}
+						else if (spr_kt[i] > 0.3)
+						{
+							light_ray.direction = (float3)transmit(V, N);
+						}
+						else
+						{
+							photon_pos[total_photons] = closest.point;
+							photon_pow[total_photons] = (float3)clampf3((light_color[l]) / (factor), 0, 1);
+							photon_count++;
+							total_photons++;
+							stored = true;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i < total_photons; ++i)
+	{
+		photon_pow[i] /= total_photons;
+	}
+	
 }
 
 __kernel void scan(
@@ -485,6 +661,7 @@ __kernel void scan(
 	__global float3 *ta, __global float3 *tb, __global float3 *tc, __global float3 *triColor, __global float *tri_kr, __global float *tri_kt, int triCount,
 	__global float3 *center, __global float *r, __global float3 *sprColor, __global float *spr_kr, __global float *spr_kt, int sprCount,
 	__global float3 *light, __global float3 *light_color, __global int *num_photons, int lightCount,
+	__global float3 *photon_pos, __global float3* photon_pow, int total_photons,
 	__global float3 *color
 	)
 {
@@ -509,9 +686,12 @@ __kernel void scan(
 	float3 direction = (float3)normal(p_location - origin);
 	ray outray = { origin, direction };
 
+	
+
 	float3 final_color = (float3)spawn(outray, ta, tb, tc, tri_kr, tri_kt, triCount, 
 		center, r, sprColor, spr_kr, spr_kt, sprCount, 
-		light, light_color, num_photons, lightCount, view);
+		light, light_color, num_photons, lightCount, view,
+		photon_pos, photon_pow, total_photons);
 
 	color[pixel] = (float3)saturate((float3)toneMapping(final_color));
 }

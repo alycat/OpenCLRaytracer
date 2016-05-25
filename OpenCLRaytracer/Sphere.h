@@ -7,7 +7,7 @@ class Sphere : public Object
 {
 public:
 	Sphere();
-	Sphere(cl_float3 center, cl_float radius, cl_float kt, cl_float kr, cl_float roughness, cl_bool isChecker);
+	Sphere(cl_float3 center, cl_float radius, cl_float3 color, cl_float kr, cl_float kt, cl_float roughness, cl_bool isChecker);
 	Sphere(const Sphere& copy);
 	Sphere& operator=(const Sphere& copy);
 	~Sphere();
