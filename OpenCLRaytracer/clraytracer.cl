@@ -255,6 +255,21 @@ float3 triangleNormal(float3 ta, float3 tb, float3 tc)
 	return (float3)(N/unit);
 }
 
+closest_point closestPointKD(
+	ray incoming, global float3 *ta, global float3 * tb, global float3* tc, int triCount,
+	global float3* center, global float *r, int sprCount,
+	global float3 *positions, global float3 * dimensions, global char * axis, global int * kdLeft, global int * kdRight,
+	global int * kdTriIndices, global int * kdTriCount, global int * kdTriOffset,
+	global int * kdSprIndices, global int * kdSprCount, global int * kdSprOffset, int nodeCount
+	)
+{
+	float3 closest = (float3)(FLT_MAX, FLT_MAX, FLT_MAX);
+	closest_point closestPt = { closest, -1, -1 };
+
+	int leaves[1000];
+
+	return closestPt;
+}
 
 
 closest_point closestPoint(
@@ -662,6 +677,9 @@ __kernel void scan(
 	__global float3 *center, __global float *r, __global float3 *sprColor, __global float *spr_kr, __global float *spr_kt, int sprCount,
 	__global float3 *light, __global float3 *light_color, __global int *num_photons, int lightCount,
 	__global float3 *photon_pos, __global float3* photon_pow, int total_photons,
+	__global float3 *positions, __global float3 *dimensions, __global char *axis, __global int * kdLeft, __global int *kdRight,
+	__global int *kdTriIndices, __global int *kdTriCount, __global int *kdTriOffset,
+	__global int *kdSprIndices, __global int *kdSprCount, __global int *kdSprOffset, int nodeCount,
 	__global float3 *color
 	)
 {

@@ -11,6 +11,7 @@
 #include "BufferMananger.h"
 #include "KernelManager.h"
 #include "ContextManager.h"
+#include "KDNode.h"
 
 class Scene{
 public:
@@ -44,6 +45,7 @@ protected:
 	Camera m_cam;
 	ContextManager* m_ctxMgr;
 	cl_float3 * m_color;
+	KDTree* m_tree;
 private:
 };
 #endif

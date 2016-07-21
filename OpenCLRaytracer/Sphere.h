@@ -12,6 +12,8 @@ public:
 	Sphere& operator=(const Sphere& copy);
 	~Sphere();
 
+	bool operator==(const Sphere& other) const;
+
 	cl_float3 getCenter();
 	void setCenter(cl_float3 center);
 	__declspec(property(get = getCenter, put = setCenter)) cl_float3 center;
@@ -19,6 +21,8 @@ public:
 	cl_float getRadius();
 	void setRadius(cl_float radius);
 	__declspec(property(get = getRadius, put = setRadius)) cl_float radius;
+
+	BoundingBox boundingBox() override;
 protected:
 	cl_float3 m_center;
 	cl_float m_radius;

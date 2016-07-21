@@ -2,6 +2,7 @@
 #define _OBJECT_H
 
 #include <CL\cl.h>
+#include "BoundingBox.h"
 
 class Object{
 public:
@@ -31,6 +32,8 @@ public:
 	cl_bool getIsChecker();
 	void setIsChecker(cl_bool isChecker);
 	__declspec(property(get = getIsChecker, put = setIsChecker)) cl_bool isChecker;
+
+	virtual BoundingBox boundingBox() = 0;
 protected:
 	cl_float3 m_color;
 	cl_float m_kt;

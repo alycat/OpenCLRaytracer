@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include "Triangle.h"
 #include <iostream>
+#include "Global.h"
 
 Triangle::Triangle() : Object()
 {
@@ -41,6 +42,26 @@ Triangle& Triangle::operator=(const Triangle& copy)
 	return *this;
 }
 
+bool Triangle::operator==(const Triangle& other) const
+{
+	for (int p = 0; p < 3; ++p){
+		if (m_points[p] != other.m_points[p]){
+			return false;
+		}
+	}
+	if (m_color != other.m_color)
+		return false;
+	if (m_kr != other.m_kr)
+		return false;
+	if (m_kt != other.m_kt)
+		return false;
+	if (m_roughness != other.m_roughness)
+		return false;
+	if (m_isChecker != other.m_isChecker)
+		return false;
+	return true;
+}
+
 Triangle::~Triangle()
 {
 
@@ -56,3 +77,19 @@ void Triangle::setB(cl_float3 B){ m_points[1] = B; }
 
 cl_float3 Triangle::getC(){ return m_points[2]; }
 void Triangle::setC(cl_float3 A){ m_points[2] = C; }
+
+BoundingBox Triangle::boundingBox()
+{
+	float maxx = std::fmax(std::fmax(m_points[0].x, m_points[1].x), m_points[2].x);
+	float minx = std::fmin(std::fmin(m_points[0].x, m_points[1].x), m_points[2].x);
+
+	float maxy = std::fmax(std::fmax(m_points[0].y, m_points[1].y), m_points[2].y);
+	float miny = std::fmin(std::fmin(m_points[0].y, m_points[1].y), m_points[2].y);
+
+	float maxz = std::fmax(std::fmax(m_points[0].z, m_points[1].z), m_points[2].z);
+	float minz = std::fmin(std::fmin(m_points[0].z, m_points[1].z), m_points[2].z);
+	cl_float3 position = { (maxx + minx) / 2.0f, (maxy + miny) / 2.0f, (maxz + minz) / 2.0f };
+	cl_float3 dimensions = { maxx - minx, maxy - miny, maxz - minz };
+
+	return BoundingBox{position, dimensions};
+}

@@ -10,6 +10,7 @@ public:
 	Triangle(cl_float3 A, cl_float3 B, cl_float3 C, cl_float3 color, cl_float kr, cl_float kt, cl_float roughness, cl_bool isChecker);
 	Triangle(const Triangle& copy);
 	Triangle& operator=(const Triangle& copy);
+	bool operator==(const Triangle& other) const;
 
 	~Triangle();
 
@@ -24,6 +25,8 @@ public:
 	cl_float3 getC();
 	void setC(cl_float3 C);
 	__declspec(property(get = getC, put = setC)) cl_float3 C;
+
+	BoundingBox boundingBox() override;
 protected:
 	cl_float3 m_points[3];
 private:

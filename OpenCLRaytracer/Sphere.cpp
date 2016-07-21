@@ -1,6 +1,7 @@
 
 #include "stdafx.h"
 #include "Sphere.h"
+#include "Global.h"
 
 Sphere::Sphere() : Object()
 {
@@ -40,9 +41,32 @@ Sphere::~Sphere()
 
 }
 
+bool Sphere::operator==(const Sphere& other) const
+{
+	if (m_color != other.m_color)
+		return false;
+	if (m_center != other.m_center)
+		return false;
+	if (m_radius != other.m_radius)
+		return false;
+	if (m_kr != other.m_kr)
+		return false;
+	if (m_kt != other.m_kt)
+		return false;
+	if (m_roughness != other.m_roughness)
+		return false;
+	if (m_isChecker != other.m_isChecker)
+		return false;
+	return true;
+}
 
 cl_float3 Sphere::getCenter(){ return m_center; }
 void Sphere::setCenter(cl_float3 center){ m_center = center; }
 
 cl_float Sphere::getRadius(){ return m_radius; }
 void Sphere::setRadius(cl_float radius){ m_radius = radius; }
+
+BoundingBox Sphere::boundingBox(){
+	cl_float3 dimensions = { m_radius * 2.0f, m_radius * 2.0f, m_radius * 2.0f };
+	return BoundingBox{ m_center, dimensions };
+}

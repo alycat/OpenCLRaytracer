@@ -19,6 +19,12 @@ public:
 	void addSphere(Sphere sphere);
 	int sprCount();
 	void createObjectBuffers();
+
+	std::vector<Triangle> triangles();
+	std::vector<Sphere> spheres();
+
+	int triangleIndex(Triangle triangle);
+	int sphereIndex(Sphere sphere);
 protected:
 	std::vector<Triangle> m_triangles;
 	std::vector<Sphere> m_spheres;

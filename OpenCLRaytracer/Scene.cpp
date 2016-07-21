@@ -1,10 +1,14 @@
 #include "stdafx.h"
 #include "Scene.h"
 #include "Parser.h"
+#include "Global.h"
 
 Scene::Scene()
 	:m_lgtMgr(new LightManager(m_bufferMgr)), m_objMgr(new ObjectManager(m_bufferMgr))
 {
+	static const cl_float3 zero3 = { 0, 0, 0 };
+	cl_float3 dimensions = { 10, 10, 10 };
+	m_tree = new KDTree(BoundingBox{ zero3, dimensions }, *m_objMgr, m_bufferMgr);
 	m_ctxMgr = ContextManager::instance();
 	const char* programSource = Parser::readFile("clraytracer.cl");
 	cl_int status;
@@ -22,8 +26,13 @@ Scene::~Scene()
 {
 	if (m_lgtMgr)
 		delete m_lgtMgr;
+	m_lgtMgr = nullptr;
 	if (m_objMgr)
 		delete m_objMgr;
+	m_objMgr = nullptr;
+	if (m_tree)
+		delete m_tree;
+	m_tree = nullptr;
 }
 
 Scene& Scene::operator=(const Scene& copy)
@@ -99,6 +108,7 @@ void Scene::setHeight(cl_float h)
 
 void Scene::createBuffers()
 {
+	m_tree->createKDTreeBuffers();
 	m_objMgr->createObjectBuffers();
 	m_lgtMgr->createLightBuffers();
 	m_color = (cl_float3*)malloc(sizeof(cl_float3) * m_cam.W * m_cam.H);
@@ -141,12 +151,27 @@ void Scene::setParamaters()
 	cl_mem photonPos = m_bufferMgr.buffer("photonPos");
 	cl_mem photonPow = m_bufferMgr.buffer("photonPow");
 
+	cl_mem positions = m_bufferMgr.buffer("positions");
+	cl_mem dimensions = m_bufferMgr.buffer("dimensions");
+	cl_mem axis = m_bufferMgr.buffer("axis");
+	cl_mem kdLeft = m_bufferMgr.buffer("kdLeft");
+	cl_mem kdRight = m_bufferMgr.buffer("kdRight");
+
+	cl_mem kdTriIndices = m_bufferMgr.buffer("kdTriIndices");
+	cl_mem kdTriCount = m_bufferMgr.buffer("kdTriCount");
+	cl_mem kdTriOffset = m_bufferMgr.buffer("kdTriOffset");
+
+	cl_mem kdSprIndices = m_bufferMgr.buffer("kdSprIndices");
+	cl_mem kdSprCount = m_bufferMgr.buffer("kdSprCount");
+	cl_mem kdSprOffset = m_bufferMgr.buffer("kdSprOffset");
+
 	cl_mem color = m_bufferMgr.buffer("color");
 
 	cl_int triCount = m_objMgr->triCount();
 	cl_int sprCount = m_objMgr->sprCount();
 	cl_int lgtCount = m_lgtMgr->lightCount();
 
+	cl_int nodeCount = m_tree->nodeCount();
 	size_t globalWorkSize[1];
 	cl_int status;
 	cl_float3* triangleA = (cl_float3*)m_bufferMgr.data("ta");
@@ -212,6 +237,18 @@ void Scene::setParamaters()
 	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &photonPos);
 	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &photonPow);
 	status |= m_kerMgr.addArgument("kernel", sizeof(cl_int), &total_photons);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &positions);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &dimensions);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &axis);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &kdLeft);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &kdRight);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &kdTriIndices);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &kdTriCount);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &kdTriOffset);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &kdSprIndices);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &kdSprCount);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &kdSprOffset);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_int), &nodeCount);
 	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &color);
 
 	kernel = m_kerMgr.kernel("kernel");
