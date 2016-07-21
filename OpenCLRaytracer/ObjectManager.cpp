@@ -39,6 +39,25 @@ void ObjectManager::addSphere(Sphere sphere)
 
 int ObjectManager::sprCount(){ return m_spheres.size(); }
 
+std::vector<Triangle> ObjectManager::triangles(){ return m_triangles; }
+std::vector<Sphere> ObjectManager::spheres(){ return m_spheres; }
+
+int ObjectManager::triangleIndex(Triangle triangle){
+	for (int t = 0; t < m_triangles.size(); ++t){
+		if (m_triangles[t] == triangle)
+			return t;
+	}
+	return -1;
+}
+
+int ObjectManager::sphereIndex(Sphere sphere){
+	for (int s = 0; s < m_spheres.size(); ++s){
+		if (m_spheres[s] == sphere)
+			return s;
+	}
+	return -1;
+}
+
 void ObjectManager::createObjectBuffers()
 {
 	int triCount = m_triangles.size();
