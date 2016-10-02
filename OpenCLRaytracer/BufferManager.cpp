@@ -36,15 +36,28 @@ const void* BufferManager::data(std::string buffer_name)
 
 cl_int BufferManager::enqueueWriteBuffer()
 {
-	cl_int status;
+	cl_int status = 0;
 	for (const auto& pair : m_buffers)
 	{
-		if (pair.second.mem_flags == CL_MEM_READ_ONLY || pair.second.mem_flags == CL_MEM_READ_WRITE)
+		if (pair.second.mem_flags == CL_MEM_READ_ONLY)// || pair.second.mem_flags == CL_MEM_READ_WRITE)
 		{
 			status = clEnqueueWriteBuffer(
 				m_ctxtMgr->cmdQueue(),
 				pair.second.buffer,
 				CL_FALSE,
+				0,
+				pair.second.size,
+				pair.second.data,
+				0,
+				NULL,
+				NULL);
+		}
+		else if (pair.second.mem_flags == CL_MEM_READ_WRITE)
+		{
+			status = clEnqueueWriteBuffer(
+				m_ctxtMgr->cmdQueue(),
+				pair.second.buffer,
+				CL_TRUE,
 				0,
 				pair.second.size,
 				pair.second.data,

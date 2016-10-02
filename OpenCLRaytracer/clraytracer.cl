@@ -46,6 +46,169 @@ typedef struct ColorData{
 	float factor;
 }color_data;
 
+
+float random()
+{
+	unsigned short lfsr = 0xACE1u;
+	unsigned bit = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5) & 1);
+	return lfsr = (lfsr >> 1) | (bit << 15);
+}
+
+float3 nodeIntersection(ray incoming, bool entry, float3 pos, float3 dim)
+{ 
+	float3 max_pt = (float3)(FLT_MAX, FLT_MAX, FLT_MAX);
+	float3 fraction = (float3)(1, 1, 1) / incoming.direction;
+
+	float minx = ((pos.x - (dim.x / 2)) - incoming.origin.x) * fraction.x;
+	float maxx = ((pos.x + (dim.x / 2)) - incoming.origin.x) * fraction.x;
+
+	float miny = ((pos.y - (dim.y / 2)) - incoming.origin.y) * fraction.y;
+	float maxy = ((pos.y + (dim.y / 2)) - incoming.origin.y) * fraction.y;
+
+	float minz = ((pos.z - (dim.z / 2)) - incoming.origin.z) * fraction.z;
+	float maxz = ((pos.z + (dim.z / 2)) - incoming.origin.z) * fraction.z;
+
+	float tmin = max(max(min(minx, maxx), min(miny, maxy)), min(minz, maxz));
+	float tmax = min(min(max(minx, maxx), max(miny, maxy)), max(minz, maxz));
+
+	if (tmax < 0)
+		return max_pt;
+	if (tmin > tmax)
+		return max_pt;
+	if (entry)
+		return incoming.origin + (incoming.direction * tmin);
+	return incoming.origin + (incoming.direction * tmax);
+}
+
+bool nodeContainsRay(ray incoming, float3 pos, float3 dim)
+{
+	float3 fraction = (float3)(1, 1, 1) / incoming.direction;
+	float minx = ((pos.x - (dim.x / 2)) - incoming.origin.x) * fraction.x;
+	float maxx = ((pos.x + (dim.x / 2)) - incoming.origin.x) * fraction.x;
+	float miny = ((pos.y - (dim.y / 2)) - incoming.origin.y) * fraction.y;
+	float maxy = ((pos.y + (dim.y / 2)) - incoming.origin.y) * fraction.y;
+	float minz = ((pos.z - (dim.z / 2)) - incoming.origin.z) * fraction.z;
+	float maxz = ((pos.z + (dim.z / 2)) - incoming.origin.z) * fraction.z;
+	float tmin = max(max(min(minx, maxx), min(miny, maxy)), min(minz, maxz));
+	float tmax = min(min(max(minx, maxx), max(miny, maxy)), max(minz, maxz));
+	if (tmax < 0)
+		return false;
+	if (tmin > tmax)
+		return false;
+	return true;
+}
+
+int getNearestNodes(ray incoming, int offset,
+	constant float3 *positions, constant float3 *dimensions, constant char *axis,
+	constant int * kdLeft, constant int *kdRight,
+	int nodeCount, global int * nodeBuffer)
+{
+	int node = 0;
+	int nodeStack[100] = {};
+	int stackCount = 0;
+	int leafCount = 1;
+	
+	while (stackCount > 0 && node < nodeCount && kdLeft[node] < nodeCount && kdRight[node] < nodeCount && leafCount - 1  < nodeCount)
+	{
+		if (nodeContainsRay(incoming, positions[node], dimensions[node]))
+		{
+			float3 entry = (float3)nodeIntersection(incoming, true, positions[node], dimensions[node]);
+			float3 exit = (float3)nodeIntersection(incoming, false, positions[node], dimensions[node]);
+			float a = 0, b = 0, s = 0;
+			char ax = axis[node];
+			if (ax == 0)
+			{
+				a = entry.x;
+				b = exit.x;
+			}
+			else if (ax == 1)
+			{
+				a = entry.y;
+				b = exit.y;
+			}
+			else{
+				a = entry.z;
+				b = exit.z;
+			}
+			if (a <= s){
+				if (b < s){
+					if (kdLeft[node] > 0){
+						node = kdLeft[node];
+					}
+					else{
+						nodeBuffer[offset + leafCount - 1] = node;
+						leafCount++;
+					}
+				}
+				else if (b == s){
+					float v = random();
+					if (v < 0.5){
+						if (kdRight[node] > 0){
+							node = kdRight[node];
+						}
+						else{
+							nodeBuffer[offset + leafCount - 1] = node;
+							leafCount++;
+						}
+					}
+					else{
+						if (kdLeft[node] > 0){
+							node = kdLeft[node];
+						}
+						else{
+							nodeBuffer[offset + leafCount - 1] = node;
+							leafCount++;
+						}
+					}
+				}
+				else{
+					if (kdLeft[node] > 0 && kdRight[node] > 0){
+						nodeStack[stackCount] = kdLeft[node]; 
+						stackCount++;
+						nodeStack[stackCount] = kdRight[node]; 
+						stackCount++;
+					}
+					else{
+						nodeBuffer[offset + leafCount - 1] = node;
+						leafCount++;
+					}
+				}
+			}
+			else{
+				if (b > s){
+					if (kdRight[node] > 0){
+						node = kdRight[node];
+					}
+					else{
+						nodeBuffer[offset + leafCount - 1] = node;
+						leafCount++;
+					}
+				}
+				else{
+					if (kdLeft[node] > 0 && kdRight[node] > 0){
+						nodeStack[stackCount] = kdLeft[node]; 
+						stackCount++;
+						nodeStack[stackCount] = kdRight[node]; 
+						stackCount++;
+					}
+					else{
+						nodeBuffer[offset + leafCount - 1] = node;
+						leafCount++;
+					}
+				}
+			}
+		}
+		else{
+			if(stackCount > 0){ 
+				node = nodeStack[stackCount];
+				stackCount--;
+			}
+		}
+	}
+	
+	return leafCount;
+}
+
 float3 toneMapping(float3 color)
 { 
 	float l = 2.0f;
@@ -255,26 +418,63 @@ float3 triangleNormal(float3 ta, float3 tb, float3 tc)
 	return (float3)(N/unit);
 }
 
+
 closest_point closestPointKD(
-	ray incoming, global float3 *ta, global float3 * tb, global float3* tc, int triCount,
-	global float3* center, global float *r, int sprCount,
-	global float3 *positions, global float3 * dimensions, global char * axis, global int * kdLeft, global int * kdRight,
-	global int * kdTriIndices, global int * kdTriCount, global int * kdTriOffset,
-	global int * kdSprIndices, global int * kdSprCount, global int * kdSprOffset, int nodeCount
+	ray incoming, constant float3 *ta, constant float3 * tb, constant float3* tc, int triCount,
+	constant float3* center, constant float *r, int sprCount,
+	constant float3 *positions, constant float3 * dimensions, constant char * axis, constant int * kdLeft, constant int * kdRight,
+	constant int * kdTriIndices, constant int * kdTriCount, constant int * kdTriOffset,
+	constant int * kdSprIndices, constant int * kdSprCount, constant int * kdSprOffset, int nodeCount, global int * nodeBuffer
 	)
 {
-	float3 closest = (float3)(FLT_MAX, FLT_MAX, FLT_MAX);
+	float3 closest =  (float3)(FLT_MAX, FLT_MAX, FLT_MAX);
 	closest_point closestPt = { closest, -1, -1 };
 
-	int leaves[1000];
-
+	int offset = get_global_id(0) * nodeCount;
+	int leafCount = getNearestNodes(incoming, offset, positions, dimensions, axis, kdLeft, kdRight, nodeCount, nodeBuffer);
+	int nodeIdx = nodeBuffer[offset];
+	
+	for(int l = 0; l < leafCount; ++l)
+	{ 
+		int nodeIdx = nodeBuffer[l + offset];
+		for (int t = 0; t < kdTriCount[nodeIdx]; ++t){ 
+			int i =  kdTriIndices[kdTriOffset[nodeIdx] + t];
+			float3 point = (float3)rayIntersectionTri(incoming, (float3)ta[i], (float3)tb[i], (float3)tc[i]);
+			if(inBounds(point) && distance(point, incoming.origin) > 0.1f)
+			{ 
+				if(distance(point, incoming.origin) < distance(closest, incoming.origin))
+				{
+					closest = point;
+					closestPt.point = closest;
+					closestPt.object = 0;
+					closestPt.index = i;
+				}
+			}
+		}
+		for (int s = 0; s < kdSprCount[nodeIdx]; ++s)
+		{
+			int i = kdSprIndices[kdSprOffset[nodeIdx] + s];
+			float3 point = (float3)rayIntersectionSpr(incoming, (float3)center[i], r[i]);
+			if (inBounds(point) && distance(point, incoming.origin) > r[i])
+			{
+				if (distance(point, incoming.origin) < distance(closest, incoming.origin))
+				{
+					closest = point;
+					closestPt.point = point;
+					closestPt.object = 1;
+					closestPt.index = i;
+				}
+			}
+		}
+	}
+	
 	return closestPt;
 }
 
 
 closest_point closestPoint(
-	ray incoming, global float3* ta, global float3 * tb, global float3* tc, int triCount,
-	global float3* center, global float *r, int sprCount
+	ray incoming, constant float3* ta, constant float3 * tb, constant float3* tc, int triCount,
+	constant float3* center, constant float *r, int sprCount
 	)
 {
 	float3 closest = (float3)(FLT_MAX, FLT_MAX, FLT_MAX);
@@ -323,9 +523,12 @@ bool isInShadow(closest_point closest, int index, int object)
 }
 
 color_data returnColorAtPointOnSphere(
-	ray incoming, global float3* ta, global float3 * tb, global float3* tc, global float* t_kr, global float* t_kt, int triCount,
-	global float3* center, global float *r, global float3* sprColor, global float* spr_kr, global float* spr_kt, int sprCount,
-	global float3* light, global float3* light_color, global int* num_photons, int lightCount, float3 view,
+	ray incoming, constant float3* ta, constant float3 * tb, constant float3* tc, constant float* t_kr, constant float* t_kt, int triCount,
+	constant float3* center, constant float *r, constant float3* sprColor, constant float* spr_kr, constant float* spr_kt, int sprCount,
+	constant float3 *positions, constant float3 * dimensions, constant char * axis, constant int * kdLeft, constant int * kdRight,
+	constant int * kdTriIndices, constant int * kdTriCount, constant int * kdTriOffset,
+	constant int * kdSprIndices, constant int * kdSprCount, constant int * kdSprOffset, int nodeCount, global int * nodeBuffer,
+	constant float3* light, constant float3* light_color, constant int* num_photons, int lightCount, float3 view,
 	float3 point, int s, int d, float factor
 	)
 { 
@@ -343,7 +546,12 @@ color_data returnColorAtPointOnSphere(
 				float3 light_pos = light[l] + offset[o];
 				ray shadow = { light_pos, (float3)normal(point - light_pos) };
 				bool inShadow = false;
-				closest_point closest = closestPoint(shadow, ta, tb, tc, triCount, center, r, sprCount);
+				//closest_point closest = closestPoint(shadow, ta, tb, tc, triCount, center, r, sprCount);
+				closest_point closest = closestPointKD(shadow, ta, tb, tc, triCount, center, r, sprCount,
+					positions, dimensions, axis, kdLeft, kdRight,
+					kdTriIndices, kdTriCount, kdTriOffset,
+					kdSprIndices, kdSprCount, kdSprOffset,
+					nodeCount, nodeBuffer);
 				if (!isInShadow(closest, s, 1))
 				{
 					light_pos = light[l];
@@ -382,9 +590,12 @@ color_data returnColorAtPointOnSphere(
 }
 
 color_data returnColorAtPointOnTriangle(
-	ray incoming, global float3* ta, global float3 * tb, global float3* tc, global float* t_kr, global float* t_kt, int triCount,
-	global float3* center, global float *r, global float3* sprColor, global float* spr_kr, global float* spr_kt, int sprCount,
-	global float3* light, global float3* light_color, global int* num_photons, int lightCount, float3 view,
+	ray incoming, constant float3* ta, constant float3 * tb, constant float3* tc, constant float* t_kr, constant float* t_kt, int triCount,
+	constant float3* center, constant float *r, constant float3* sprColor, constant float* spr_kr, constant float* spr_kt, int sprCount,
+	constant float3 *positions, constant float3 * dimensions, constant char * axis, constant int * kdLeft, constant int * kdRight,
+	constant int * kdTriIndices, constant int * kdTriCount, constant int * kdTriOffset,
+	constant int * kdSprIndices, constant int * kdSprCount, constant int * kdSprOffset, int nodeCount, global int * nodeBuffer,
+	constant float3* light, constant float3* light_color, constant int* num_photons, int lightCount, float3 view,
 	float3 point, int t, int d, float factor
 	)
 { 
@@ -407,7 +618,12 @@ color_data returnColorAtPointOnTriangle(
 				float3 light_pos = light[l] + offset[o];
 				ray shadow = { light_pos, (float3)normal(point - light_pos) };
 				bool inShadow = false; 
-				closest_point closest = closestPoint(shadow, ta, tb, tc, triCount, center, r, sprCount);
+				closest_point closest = closestPointKD(shadow, ta, tb, tc, triCount, center, r, sprCount,
+					positions, dimensions, axis, kdLeft, kdRight,
+					kdTriIndices, kdTriCount, kdTriOffset,
+					kdSprIndices, kdSprCount, kdSprOffset,
+					nodeCount, nodeBuffer);
+
 				if (!isInShadow(closest, t, 0))
 				{
 					light_pos = light[l];
@@ -523,9 +739,12 @@ float3 photonMap(float3 point, global float3* photon_pos, global float3* photon_
 }
 
 float3 spawn(
-	ray incoming, global float3* ta, global float3 * tb, global float3* tc, global float* t_kr, global float* t_kt, int triCount,
-	global float3* center, global float *r, global float3* sprColor, global float* spr_kr, global float* spr_kt, int sprCount,
-	global float3* light, global float3* lightColor, global int* num_photons, int lightCount, float3 view,
+	ray incoming, constant float3* ta, constant float3 * tb, constant float3* tc, constant float* t_kr, constant float* t_kt, int triCount,
+	constant float3* center, constant float *r, constant float3* sprColor, constant float* spr_kr, constant float* spr_kt, int sprCount,
+	constant float3 *positions, constant float3 * dimensions, constant char * axis, constant int * kdLeft, constant int * kdRight,
+	constant int * kdTriIndices, constant int * kdTriCount, constant int * kdTriOffset,
+	constant int * kdSprIndices, constant int * kdSprCount, constant int * kdSprOffset, int nodeCount, global int * nodeBuffer,
+	constant float3* light, constant float3* lightColor, constant int* num_photons, int lightCount, float3 view,
 	global float3* photon_pos, global float3* photon_pow, int total_photons
 	)
 {
@@ -534,19 +753,35 @@ float3 spawn(
 	float factor = 1.0;
 	ray outray = incoming;
 	float3 photon_color = (float3)(0, 0, 0);
-	for (int d = 0; d < 1000; ++d)
+	for (int d = 0; d < 3; ++d)
 	{
-		closest_point closest = closestPoint(outray, ta, tb, tc, triCount, center, r, sprCount);
+		//closest_point closest = closestPoint(outray, ta, tb, tc, triCount, center, r, sprCount);
+			closest_point closest = closestPointKD(outray, ta, tb, tc, triCount, center, r, sprCount,
+			positions, dimensions, axis, kdLeft, kdRight, 
+			kdTriIndices, kdTriCount, kdTriOffset,
+			kdSprIndices, kdSprCount, kdSprOffset,
+			nodeCount, nodeBuffer);
+
 		color_data colordata = { (float3)(0, 0, 0), outray, d, factor };
 		if (distance(max_pt, closest.point) == 0)
 		{
 			color += (float3)(0.0f, 0.5f, 1.0f) * factor;
-			break;
+			//break;
 		}
 		else if (closest.object == 0)
-			colordata = returnColorAtPointOnTriangle(outray, ta, tb, tc, t_kr, t_kt, triCount, center, r, sprColor, spr_kr, spr_kt, sprCount, light, lightColor, num_photons, lightCount, view, closest.point, closest.index, d, factor);
+			colordata = returnColorAtPointOnTriangle(outray, ta, tb, tc, t_kr, t_kt, triCount, center, r, sprColor, spr_kr, spr_kt, sprCount,
+			positions, dimensions, axis, kdLeft, kdRight,
+			kdTriIndices, kdTriCount, kdTriOffset,
+			kdSprIndices, kdSprCount, kdSprOffset,
+			nodeCount, nodeBuffer, 
+			light, lightColor, num_photons, lightCount, view, closest.point, closest.index, d, factor);
 		else if (closest.object == 1)
-			colordata = returnColorAtPointOnSphere(outray, ta, tb, tc, t_kr, t_kt, triCount, center, r, sprColor, spr_kr, spr_kt, sprCount, light, lightColor, num_photons, lightCount, view, closest.point, closest.index, d, factor);
+			colordata = returnColorAtPointOnSphere(outray, ta, tb, tc, t_kr, t_kt, triCount, center, r, sprColor, spr_kr, spr_kt, sprCount, 
+			positions, dimensions, axis, kdLeft, kdRight,
+			kdTriIndices, kdTriCount, kdTriOffset,
+			kdSprIndices, kdSprCount, kdSprOffset,
+			nodeCount, nodeBuffer,
+			light, lightColor, num_photons, lightCount, view, closest.point, closest.index, d, factor);
 		
 		photon_color += (float3)photonMap(closest.point, photon_pos, photon_pow, total_photons);
 		d = colordata.depth;
@@ -554,7 +789,7 @@ float3 spawn(
 		outray = colordata.outray;
 		color += colordata.color;
 	}
-	return color +(photon_color * 10);
+	return color;// +(photon_color * 10);
 }
 
 float3 clampf3(float3 incoming, float minf, float maxf)
@@ -562,12 +797,6 @@ float3 clampf3(float3 incoming, float minf, float maxf)
 	return (float3)(max(min(incoming.x, maxf), minf), max(min(incoming.y, maxf), minf), max(min(incoming.z, maxf), minf));
 }
 
-float random()
-{
-	unsigned short lfsr = 0xACE1u;
-	unsigned bit = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5) & 1);
-	return lfsr = (lfsr >> 1) | (bit << 15);
-}
 
 float3 random3()
 {
@@ -575,9 +804,9 @@ float3 random3()
 }
 
 __kernel void buildPhotonMap(
-	__global float3 *ta, __global float3 *tb, __global float3 *tc, __global float3 *triColor, __global float *tri_kr, __global float *tri_kt, int triCount,
-	__global float3 *center, __global float *r, __global float3 *sprColor, __global float *spr_kr, __global float *spr_kt, int sprCount,
-	__global float3 *light, __global float3 *light_color, __global int *num_photons, int lightCount,
+	__constant float3 *ta, __constant float3 *tb, __constant float3 *tc, __constant float3 *triColor, __constant float *tri_kr, __constant float *tri_kt, int triCount,
+	__constant float3 *center, __constant float *r, __constant float3 *sprColor, __constant float *spr_kr, __constant float *spr_kt, int sprCount,
+	__constant float3 *light, __constant float3 *light_color, __constant int *num_photons, int lightCount,
 	__global float3 *photon_pos, __global float3 *photon_pow
 	)
 {
@@ -673,13 +902,13 @@ __kernel void buildPhotonMap(
 __kernel void scan(
 	float3 origin, float3 view, float3 up,
 	int W, int H, float w, float h, float f,
-	__global float3 *ta, __global float3 *tb, __global float3 *tc, __global float3 *triColor, __global float *tri_kr, __global float *tri_kt, int triCount,
-	__global float3 *center, __global float *r, __global float3 *sprColor, __global float *spr_kr, __global float *spr_kt, int sprCount,
-	__global float3 *light, __global float3 *light_color, __global int *num_photons, int lightCount,
+	__constant float3 *ta, __constant float3 *tb, __constant float3 *tc, __constant float3 *triColor, __constant float *tri_kr, __constant float *tri_kt, int triCount,
+	__constant float3 *center, __constant float *r, __constant float3 *sprColor, __constant float *spr_kr, __constant float *spr_kt, int sprCount,
+	__constant float3 *light, __constant float3 *light_color, __constant int *num_photons, int lightCount,
 	__global float3 *photon_pos, __global float3* photon_pow, int total_photons,
-	__global float3 *positions, __global float3 *dimensions, __global char *axis, __global int * kdLeft, __global int *kdRight,
-	__global int *kdTriIndices, __global int *kdTriCount, __global int *kdTriOffset,
-	__global int *kdSprIndices, __global int *kdSprCount, __global int *kdSprOffset, int nodeCount,
+	__constant float3 *positions, __constant float3 *dimensions, __constant char *axis, __constant int * kdLeft, __constant int *kdRight,
+	__constant int *kdTriIndices, __constant int *kdTriCount, __constant int *kdTriOffset,
+	__constant int *kdSprIndices, __constant int *kdSprCount, __constant int *kdSprOffset, int nodeCount, __global int * nodeBuffer,
 	__global float3 *color
 	)
 {
@@ -703,11 +932,14 @@ __kernel void scan(
 
 	float3 direction = (float3)normal(p_location - origin);
 	ray outray = { origin, direction };
-
 	
 
 	float3 final_color = (float3)spawn(outray, ta, tb, tc, tri_kr, tri_kt, triCount, 
 		center, r, sprColor, spr_kr, spr_kt, sprCount, 
+		positions, dimensions, axis, kdLeft, kdRight,
+		kdTriIndices, kdTriCount, kdTriOffset,
+		kdSprIndices, kdSprCount, kdSprOffset,
+		nodeCount, nodeBuffer,
 		light, light_color, num_photons, lightCount, view,
 		photon_pos, photon_pow, total_photons);
 

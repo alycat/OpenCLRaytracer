@@ -25,9 +25,16 @@ ObjectManager& ObjectManager::operator=(const ObjectManager& copy)
 }
 
 
+void ObjectManager::setTriangles(std::vector<Triangle> triangles)
+{
+	m_triangles = triangles;
+}
+
+
 void ObjectManager::addTriangle(Triangle triangle)
 {
 	m_triangles.push_back(triangle);
+	m_positions.push_back(triangle.boundingBox().position);
 }
 
 int ObjectManager::triCount(){ return m_triangles.size(); }
@@ -35,27 +42,21 @@ int ObjectManager::triCount(){ return m_triangles.size(); }
 void ObjectManager::addSphere(Sphere sphere)
 {
 	m_spheres.push_back(sphere);
+	m_positions.push_back(sphere.center);
 }
 
 int ObjectManager::sprCount(){ return m_spheres.size(); }
 
 std::vector<Triangle> ObjectManager::triangles(){ return m_triangles; }
 std::vector<Sphere> ObjectManager::spheres(){ return m_spheres; }
+std::vector<cl_float3> ObjectManager::positions(){ return m_positions; }
 
 int ObjectManager::triangleIndex(Triangle triangle){
-	for (int t = 0; t < m_triangles.size(); ++t){
-		if (m_triangles[t] == triangle)
-			return t;
-	}
-	return -1;
+	return std::find(m_triangles.begin(), m_triangles.end(), triangle) - m_triangles.begin();
 }
 
 int ObjectManager::sphereIndex(Sphere sphere){
-	for (int s = 0; s < m_spheres.size(); ++s){
-		if (m_spheres[s] == sphere)
-			return s;
-	}
-	return -1;
+	return std::find(m_spheres.begin(), m_spheres.end(), sphere) - m_spheres.begin();
 }
 
 void ObjectManager::createObjectBuffers()

@@ -11,7 +11,7 @@ public:
 	KDNode();
 	KDNode(BoundingBox bbox, 
 		KDNode* left = nullptr, KDNode* right = nullptr, 
-		std::vector<Triangle> triangles = {}, std::vector<Sphere> spheres = {}, char axis = 0);
+		std::vector<Triangle> triangles = {}, std::vector<Sphere> spheres = {}, std::vector<cl_float3> positions = {}, char axis = 0);
 	KDNode(const KDNode & other);
 	KDNode& operator=(const KDNode & other);
 	~KDNode();
@@ -25,6 +25,7 @@ public:
 
 	std::vector<Triangle> m_triangles;
 	std::vector<Sphere> m_spheres;
+	std::vector<cl_float3> m_positions;
 	void nodes(std::vector<KDNode*>& nodes);
 protected:
 private:
@@ -44,6 +45,7 @@ public:
 	int nodeCount();
 protected:
 	KDNode* m_root;
+	int triangleIndicesGenerator();
 
 	std::vector<Triangle> m_triangles;
 	std::vector<Sphere> m_spheres;

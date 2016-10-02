@@ -22,12 +22,18 @@ public:
 
 	std::vector<Triangle> triangles();
 	std::vector<Sphere> spheres();
+	std::vector<cl_float3> positions();
 
 	int triangleIndex(Triangle triangle);
 	int sphereIndex(Sphere sphere);
+
+	void setTriangles(std::vector<Triangle> triangles);
+
+	__declspec(property(put = setTriangles)) std::vector<Triangle> triangleList;
 protected:
 	std::vector<Triangle> m_triangles;
 	std::vector<Sphere> m_spheres;
+	std::vector<cl_float3> m_positions;
 	BufferManager& m_bufferMgr;
 	cl_float3 *ta;
 	cl_float3 *tb;

@@ -2,13 +2,12 @@
 #include "Scene.h"
 #include "Parser.h"
 #include "Global.h"
+#include <stdio.h>
 
 Scene::Scene()
 	:m_lgtMgr(new LightManager(m_bufferMgr)), m_objMgr(new ObjectManager(m_bufferMgr))
 {
-	static const cl_float3 zero3 = { 0, 0, 0 };
-	cl_float3 dimensions = { 10, 10, 10 };
-	m_tree = new KDTree(BoundingBox{ zero3, dimensions }, *m_objMgr, m_bufferMgr);
+	
 	m_ctxMgr = ContextManager::instance();
 	const char* programSource = Parser::readFile("clraytracer.cl");
 	cl_int status;
@@ -33,6 +32,7 @@ Scene::~Scene()
 	if (m_tree)
 		delete m_tree;
 	m_tree = nullptr;
+	free(m_nodeBuffer);
 }
 
 Scene& Scene::operator=(const Scene& copy)
@@ -106,13 +106,32 @@ void Scene::setHeight(cl_float h)
 	m_cam.setHeight(h);
 }
 
+void Scene::setTriangles(std::vector<Triangle> triangles){
+	m_objMgr->triangleList = triangles;
+}
+
 void Scene::createBuffers()
 {
+	static const cl_float3 zero3 = { 0, 0, 0 };
+	cl_float3 dimensions = { 10, 10, 10 };
+	m_tree = new KDTree(BoundingBox{ zero3, dimensions }, *m_objMgr, m_bufferMgr);
 	m_tree->createKDTreeBuffers();
+
+	
+
+	int nodeBufferSize = m_tree->nodeCount() * m_cam.W * m_cam.H;
+	m_nodeBuffer = (cl_int*)calloc(nodeBufferSize, sizeof(cl_int));
+
+	char buffer[256];
+	sprintf(buffer, "Number of nodes is %d.\n", m_tree->nodeCount());
+	OutputDebugString(buffer);
+
+
 	m_objMgr->createObjectBuffers();
 	m_lgtMgr->createLightBuffers();
 	m_color = (cl_float3*)malloc(sizeof(cl_float3) * m_cam.W * m_cam.H);
 	m_bufferMgr.createBuffer("color", sizeof(cl_float3) * m_cam.W * m_cam.H, m_color, CL_MEM_WRITE_ONLY);
+	m_bufferMgr.createBuffer("nodeBuffer", sizeof(cl_int) * nodeBufferSize, m_nodeBuffer, CL_MEM_READ_WRITE);
 	m_bufferMgr.enqueueWriteBuffer();
 }
 
@@ -167,6 +186,8 @@ void Scene::setParamaters()
 
 	cl_mem color = m_bufferMgr.buffer("color");
 
+	cl_mem nodeBuffer = m_bufferMgr.buffer("nodeBuffer");
+
 	cl_int triCount = m_objMgr->triCount();
 	cl_int sprCount = m_objMgr->sprCount();
 	cl_int lgtCount = m_lgtMgr->lightCount();
@@ -175,6 +196,7 @@ void Scene::setParamaters()
 	size_t globalWorkSize[1];
 	cl_int status;
 	cl_float3* triangleA = (cl_float3*)m_bufferMgr.data("ta");
+
 	
 	status = m_kerMgr.addArgument("photonKernel", sizeof(cl_mem), &ta);
 	status |= m_kerMgr.addArgument("photonKernel", sizeof(cl_mem), &tb);
@@ -249,11 +271,14 @@ void Scene::setParamaters()
 	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &kdSprCount);
 	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &kdSprOffset);
 	status |= m_kerMgr.addArgument("kernel", sizeof(cl_int), &nodeCount);
+	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &nodeBuffer);
 	status |= m_kerMgr.addArgument("kernel", sizeof(cl_mem), &color);
 
 	kernel = m_kerMgr.kernel("kernel");
 
 	globalWorkSize[0] = m_cam.W * m_cam.H;
 	status = clEnqueueNDRangeKernel(m_ctxMgr->cmdQueue(), kernel, 1, NULL, globalWorkSize, NULL, 0, NULL, NULL);
+	OutputDebugString("Kernel Args passed");
 	status = clEnqueueReadBuffer(m_ctxMgr->cmdQueue(), color, CL_TRUE, 0, sizeof(cl_float3) * m_cam.W * m_cam.H, (void*)(m_bufferMgr.data("color")), 0, NULL, NULL);
+	OutputDebugString("Kernel color read");
 }

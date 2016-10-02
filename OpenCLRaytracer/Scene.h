@@ -31,6 +31,7 @@ public:
 	void setH(cl_int H);
 	void setWidth(cl_float w);
 	void setHeight(cl_float h);
+	void setTriangles(std::vector<Triangle> trianlges);
 
 	void createBuffers();
 	void setParamaters();
@@ -46,6 +47,8 @@ protected:
 	ContextManager* m_ctxMgr;
 	cl_float3 * m_color;
 	KDTree* m_tree;
+
+	cl_int * m_nodeBuffer;
 private:
 };
 #endif

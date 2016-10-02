@@ -14,6 +14,7 @@
 #include "Parser.h"
 #include "Scene.h"
 #include <vector>
+#include "ply.h"
 
 HBITMAP bitmap = NULL;
 HANDLE buffer = NULL;
@@ -31,6 +32,92 @@ const char* currentDirectory()
 		return "";
 	}
 	return currentPath;
+}
+
+
+
+char *elem_names[] = {
+	"vertex", "face"
+};
+
+typedef struct Vertex{
+	float x, y, z, confidence, intensity;
+};
+
+typedef struct Face{
+	unsigned char nverts;
+	int *verts;
+};
+
+PlyProperty vert_props[] = {
+	{ "x", PLY_FLOAT, PLY_FLOAT, offsetof(Vertex, x), 0, 0, 0, 0 },
+	{ "y", PLY_FLOAT, PLY_FLOAT, offsetof(Vertex, y), 0, 0, 0, 0 },
+	{ "z", PLY_FLOAT, PLY_FLOAT, offsetof(Vertex, z), 0, 0, 0, 0 },
+	{ "confidence", PLY_FLOAT, PLY_FLOAT, offsetof(Vertex, confidence), 0, 0, 0, 0 },
+	{ "intensity", PLY_FLOAT, PLY_FLOAT, offsetof(Vertex, intensity), 0, 0, 0, 0 }
+};
+
+const PlyProperty face_props[] = {
+	{ "vertex_indices", PLY_INT, PLY_INT, offsetof(Face, verts),
+	1, PLY_UCHAR, PLY_UCHAR, offsetof(Face, nverts) },
+};
+
+static void ReadPlyFile(char* filepath, Scene& scene)
+{
+	int i, j, k;
+	PlyFile *ply = NULL;
+	int nelems;
+	char **elist = NULL;
+	int file_type;
+	float version;
+	int nprops;
+	int num_elems;
+	PlyProperty **plist = NULL;
+	Vertex **vlist = NULL;
+	Face **flist = NULL;
+	char * elem_name = NULL;
+	int num_obj_info;
+
+	ply = ply_open_for_reading(filepath, &nelems, &elist, &file_type, &version);
+	for (int i = 0; i < nelems; ++i)
+	{
+		elem_name = elist[i];
+		plist = ply_get_element_description(ply, elem_name, &num_elems, &nprops);
+		if (equal_strings("vertex", elem_name)){
+			vlist = (Vertex **)malloc(sizeof(Vertex *) * num_elems);
+			for (int i = 0; i < 3; ++i){
+				ply_get_property(ply, elem_name, &vert_props[i]);
+			}
+
+			for (j = 0; j < num_elems; ++j){
+				vlist[j] = (Vertex*)malloc(sizeof(Vertex));
+				ply_get_element(ply, (void*)vlist[j]);
+			}
+		}
+		else if (equal_strings("face", elem_name)){
+			flist = (Face**)malloc(sizeof(Face*)*num_elems);
+			ply_get_property(ply, elem_name, const_cast<PlyProperty*>(&face_props[0]));
+
+			for (k = 0; k < num_elems; ++k){
+				flist[k] = (Face*)malloc(sizeof(Face));
+				ply_get_element(ply, (void*)flist[k]);
+				cl_float3 points[3];
+				for (int p = 0; p < 3; ++p){
+					points[p].x = vlist[flist[k]->verts[p]]->x;// -1.0f;
+					points[p].y = vlist[flist[k]->verts[p]]->y;// -0.8f;
+					points[p].z = vlist[flist[k]->verts[p]]->z;// +4.0f;
+				}
+				static cl_float3 black = { 0, 0, 0 };
+				static int count = 0;
+				scene.addTriangle(Triangle(points[0], points[1], points[2], black, 0.0, 0.0, 0.3, false));
+				free(flist[k]);
+			}
+			free(flist);
+		}
+	}
+	if (ply)
+		ply_close(ply);
+	free(vlist);
 }
 
 //#include <png.h>
@@ -210,6 +297,11 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			cl_float3 c_view = reader.readFloat3(section, "view");
 			cl_float3 c_up = reader.readFloat3(section, "up");
 			scene.setCamera(c_pos, c_view, c_up, W, H, w, h, f);
+		}
+		else if (type == "model")
+		{
+			char * filename = reader.readString(section, "file");
+			ReadPlyFile(filename, scene);
 		}
 	}
 
