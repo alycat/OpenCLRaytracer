@@ -753,7 +753,7 @@ float3 spawn(
 	float factor = 1.0;
 	ray outray = incoming;
 	float3 photon_color = (float3)(0, 0, 0);
-	for (int d = 0; d < 3; ++d)
+	for (int d = 0; d < 10; ++d)
 	{
 		//closest_point closest = closestPoint(outray, ta, tb, tc, triCount, center, r, sprCount);
 			closest_point closest = closestPointKD(outray, ta, tb, tc, triCount, center, r, sprCount,
@@ -787,7 +787,7 @@ float3 spawn(
 		d = colordata.depth;
 		factor = colordata.factor;
 		outray = colordata.outray;
-		color += colordata.color;
+		color += (colordata.color);
 	}
 	return color;// +(photon_color * 10);
 }
